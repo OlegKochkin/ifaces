@@ -1,0 +1,317 @@
+<!doctype html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Скорость на интерфейсах</title>
+<script src="raphael-min.js" type="text/javascript" charset="utf-8"></script>
+
+</head>
+<body>
+
+<script>
+
+// By Oleg Kochkin 2010. <kochkin.tk>
+// Данное ПО распространяется под лицензией GPL
+//
+// Использованы:
+//
+// - Библиотека Raphaël для JavaScript. Copyright (c) 2008 - 2010 Dmitry Baranovskiy <raphaeljs.com>
+// - Части кода примеров Raphaël. Copyright (c) 2008 - 2010 Dmitry Baranovskiy <raphaeljs.com>
+// - Пример по Ajax - http://forum.eugen.su/showthread.php?t=132&p=599
+
+function createRequest() {
+	if (request != null) return;
+	try {
+		request = new XMLHttpRequest();
+	} catch (failed) {
+		request = null;
+	}
+	if (request == null) alert("Error creating request object!");
+}
+
+// Посылка запроса на сервер
+function getIfacesSpeed() {
+    createRequest();
+    var url = "getIfacesSpeed.php";
+    request.onreadystatechange = viewSpeed();
+    request.open("GET", url, true);
+    request.send(null);
+}
+
+function paintIndicator(nc, left, top, nameText, scaleIndex, diameter, width, border){
+	var scale=ind[nc].scaleValuesDigits[scaleIndex];
+	var valueText=ind[nc].scaleValuesText[scaleIndex];
+	ind[nc].currentIdScale=scaleIndex;
+	ind[nc].scale=scale;
+	ind[nc].diameter=diameter;	// Диаметр
+	ind[nc].width=width;
+	ind[nc].border=border;
+	ind[nc].digits = [];
+	ind[nc].scale10 = [];
+	ind[nc].scale5 = [];
+	ind[nc].max=0;
+	ind[nc].min=10;
+
+var r2=ind[nc].diameter/2,
+	r1=r2-r2/20,
+	r5=r2-r2/3,
+	r4=r2-r2/13.33,
+	r3=r2-r2/6.67,
+	r5=r2-r2/3;
+	cx=r2+width+border,
+	cy=r2+width+border,
+	beta=2*Math.PI/130,
+	pathParams={stroke: "#0f0","stroke-width": width,"stroke-linecap": "round"};
+	ind[nc].canvas=Raphael (left, top, r2*2+width*2+border*2, r2*2+width*2+border*2);
+
+// Подложка
+bg1 = ind[nc].canvas.circle(r2+width+border, r2+width+border, r2+width+border-4);
+bg1.attr("fill", "black");
+// Центр стрелки
+bg2 = ind[nc].canvas.circle(r2+width+border, r2+width+border, r2/10);
+bg2.attr("fill", "blue");
+for (var i=0; i<130; i++){
+	var alpha=beta*i-Math.PI/2,
+		cos=Math.cos(alpha),
+		sin=Math.sin(alpha);
+	if (i==52){
+// Индикатор переполнения
+		ind[nc].over = ind[nc].canvas.circle(cx+r1*cos,cy+r1*sin, r2/20);
+		ind[nc].over.attr({gradient: "300-#fff-#f00:50-#900"});
+//		ind[nc].over.hide();
+		}
+// Мелкие риски шкалы
+	if (i<50 || i>80){
+			var sector=ind[nc].canvas.path ("M"+(cx+r1*cos)+" "+(cy+r1*sin)+"L"+(cx+r2*cos)+" "+(cy+r2*sin)).attr (pathParams);
+		}
+	}
+// Еденицы измерения
+ind[nc].valueTextObj=ind[nc].canvas.text (r2+ind[nc].width+ind[nc].border, r2+r2/2.86, valueText);
+ind[nc].valueTextObj.attr ({fill: "gray", "font-size": r2/9, "font-style": "italic", "font-weight": "bold"});
+
+for (var j=-5;j<=5;j++){
+	var beta2=2*Math.PI/13,
+		alpha2=beta2*j-Math.PI/2,
+		cos2=Math.cos(alpha2),
+		sin2=Math.sin(alpha2),
+		dig=(j+5)*scale/10;
+// Цифры
+ 		ind[nc].digits[j+5]=ind[nc].canvas.text (cx+r5*cos2,cy+r5*sin2,dig+"");
+ 		ind[nc].digits[j+5].attr ({fill: "#0ff", "font-size": r2/8.33, "font-weight": "bold"});
+// Риски шкалы 1/10
+		ind[nc].scale10[j+5]=ind[nc].canvas.path ("M"+(cx+r3*cos2)+" "+(cy+r3*sin2)+"L"+(cx+r2*cos2)+" "+(cy+r2*sin2)).attr ({stroke: "yellow","stroke-width": r2/40,"stroke-linecap": "round"})
+// Риски шкалы 1/5
+	if (j<5){
+		var alpha3=beta2*(j+0.5)-Math.PI/2,
+		cos3=Math.cos(alpha3),
+		sin3=Math.sin(alpha3);
+		ind[nc].scale5[j+5]=ind[nc].canvas.path ("M"+(cx+r4*cos3)+" "+(cy+r4*sin3)+"L"+(cx+r2*cos3)+" "+(cy+r2*sin3)).attr({stroke: "yellow","stroke-width": r2/66.66,"stroke-linecap": "round"})
+		}
+	}
+// Сообщение
+ind[nc].message=ind[nc].canvas.text (r2+width+border, r2+r2/1.2, "Запуск");
+ind[nc].message.attr ({fill: "red", "font-size": r2/9, "font-style": "italic", "font-weight": "bold"});
+ind[nc].message.animate ({opacity: 0},3000);
+
+setScale (nc);
+
+// Название индикатора
+var nameTextIn=ind[nc].canvas.text (r2+width+border, r2-r2/4, nameText);
+nameTextIn.attr ({fill: "gray", "font-size": r2/9, "font-style": "italic", "font-weight": "bold"});
+// Стрелка
+ind[nc].arrow=ind[nc].canvas.path ("M"+(r2+width+border)+" "+(r2+width+border+r2/6.5)+"L"+(r2+width+border)+" "+(r2-r2/1.35)).attr({stroke: "white","stroke-width": r2/28.5,"stroke-linecap": "round"})
+// Верхушка центра стрелки
+bg3 = ind[nc].canvas.circle(r2+width+border, r2+width+border, r2/20);
+bg3.attr("fill", "red");
+// Стекло
+bg4 = ind[nc].canvas.image("glass.png", 0, 0, (r2+width+border)*2, (r2+width+border)*2);
+// Поворот стрелки в нулевое положение
+ind[nc].arrow.rotate (360*8/13, r2+width+border, r2+width+border);
+var angle=360*8/13;
+ind[nc].arrow.animate({rotation: [angle, ind[nc].diameter/2+ind[nc].width+ind[nc].border, ind[nc].diameter/2+ind[nc].width+ind[nc].border]}, 10);
+}
+
+function setScale (nc){
+var scale=ind[nc].scaleValuesDigits[ind[nc].currentIdScale];
+var valueText=ind[nc].scaleValuesText[ind[nc].currentIdScale];
+ind[nc].scale=scale;
+ind[nc].valueText=valueText;
+ind[nc].valueTextObj.attr ("text",valueText);
+for (var j=-5;j<=5;j++){
+	var dig=(j+5)*scale/10;
+	dig=dig+"";
+	ind[nc].digits[j+5].attr ("text", dig);
+	}
+ind[nc].message.attr ({"opacity": 1, "text": "Смена шкалы"});
+ind[nc].message.animate ({opacity: 0},5000);
+}
+
+function arrowRotate (nc, aind){
+	var sc=ind[nc].scaleValues[ind[nc].currentIdScale];
+	if (ind[nc].firstTeek){
+		var curSc=0;
+		for (var i=0;i<ind[nc].scaleValues.length;i++){
+			curSc=ind[nc].scaleValues[i];
+			if (aind<curSc){
+				ind[nc].currentIdScale=i;
+				sc=curSc;
+				setScale (nc);
+				ind[nc].firstTeek=false;
+				break;
+				}
+			}
+		}
+// Если переполнение -> включить индикатор и "упереть" стрелку
+		if (aind>sc){
+// Если значение больше шкалы
+		aind=ind[nc].scale;
+		ind[nc].over.attr({gradient: "300-#fff-#f00:50-#900"});
+		ind[nc].max++;
+		if (ind[nc].max>scaleChangeTics){
+// Если значение зашкаливает scaleChangeTics тиков подряд
+			ind[nc].currentIdScale++;
+			if (ind[nc].currentIdScale > ind[nc].scaleValues.length-1) ind[nc].currentIdScale = ind[nc].scaleValues.length-1;
+			else setScale (nc);
+			ind[nc].max=0;
+			}
+		}
+	else {
+// Если значение меньше шкалы
+		ind[nc].over.attr({gradient: "300-#666-#600:50-#300"});
+		ind[nc].max--;
+		if (ind[nc].max<0) ind[nc].max=0;
+		}
+	if (aind<sc/10){
+// Если значение меньше 1/10 шкалы
+		ind[nc].min--;
+		if (ind[nc].min<0){
+			ind[nc].currentIdScale--;
+			if (ind[nc].currentIdScale < 0) ind[nc].currentIdScale = 0;
+			else setScale (nc);
+			ind[nc].min=scaleChangeTics;
+			}
+		}
+	else{
+		ind[nc].min++;
+		if (ind[nc].min>scaleChangeTics) ind[nc].min=scaleChangeTics;
+		}
+// Пересчёт килобайтов в градусы
+	var angle=360*80/130+aind*360/(sc+sc*3/10);
+// Поворот стрелки на нужный угол
+	ind[nc].arrow.animate({rotation: [angle, ind[nc].diameter/2+ind[nc].width+ind[nc].border, ind[nc].diameter/2+ind[nc].width+ind[nc].border]}, 5000);
+}
+
+// При получении данных от сервера
+function viewSpeed() {
+	if (request.readyState == 4) {
+		var str=request.responseText;
+
+// Получаемые данные:
+// "eth0rx|eth0tx|eth1rx|eth1tx|ppp0rx|ppp0tx"
+		values=str.split ("|");
+// values[0] - eth0rx
+// values[1] - eth0tx
+// values[2] - eth1rx
+// values[3] - eth1tx
+// values[4] - ppp0rx
+// values[5] - ppp0rx
+
+current_rx = values[4] - prev_rx;
+prev_rx = values[4];
+current_tx = values[5] - prev_tx;
+prev_tx = values[5];
+
+// alert (current_tx);
+ 		arrowRotate ("PPP0Rx", Number(current_rx / 2048));
+ 		arrowRotate ("PPP0Tx", Number(current_tx / 2048));
+// 		arrowRotate ("PPP0Rx", Number(values[4]));
+// 		arrowRotate ("PPP0Tx", Number(values[5]));
+// 		arrowRotate ("eth1Rx", Number(values[2]));
+// 		arrowRotate ("eth1Tx", Number(values[3]));
+// 		arrowRotate ("AllInetRx", Number(values[2])+Number(values[4]));
+// 		arrowRotate ("AllInetTx", Number(values[3])+Number(values[5]));
+
+// 		arrowRotate ("Eth0Rx", Number(values[0]));
+
+		request = null;
+	}
+}
+
+var ind=[];
+var request = null;
+var scaleChangeTics=5;
+
+var prev_rx = 0, prev_tx = 0, current_rx = 0, current_tx = 0;
+
+window.onload = function () {
+
+var vaules=[];
+ind["default"]=[];
+ind["default"].scaleValuesDigits=[1,10,20,50,100,200,500,2000,10,20];
+ind["default"].scaleValues=[1,10,20,50,100,200,500,2048, 10240,20480];
+ind["default"].scaleValuesText=["КБайт/сек","КБайт/сек","КБайт/сек","КБайт/сек","КБайт/сек","КБайт/сек","КБайт/сек","КБайт/сек","МБайт/сек","МБайт/сек"];
+ind["default"].firstTeek=true;
+
+ind["PPP0Rx"]=[];
+ind["PPP0Tx"]=[];
+//ind["eth1Rx"]=[];
+//ind["eth1Tx"]=[];
+//ind["AllInetRx"]=[];
+//ind["AllInetTx"]=[];
+
+// Шкалы
+ind["PPP0Rx"].scaleValuesDigits=ind["default"].scaleValuesDigits.slice()
+ind["PPP0Rx"].scaleValues=ind["default"].scaleValues.slice();
+ind["PPP0Rx"].scaleValuesText=ind["default"].scaleValuesText.slice();
+ind["PPP0Rx"].firstTeek=ind["default"].firstTeek;
+
+ind["PPP0Tx"].scaleValuesDigits=ind["default"].scaleValuesDigits.slice()
+ind["PPP0Tx"].scaleValues=ind["default"].scaleValues.slice();
+ind["PPP0Tx"].scaleValuesText=ind["default"].scaleValuesText.slice();
+ind["PPP0Tx"].firstTeek=ind["default"].firstTeek;
+
+//ind["eth1Rx"].scaleValuesDigits=ind["default"].scaleValuesDigits.slice()
+//ind["eth1Rx"].scaleValues=ind["default"].scaleValues.slice();
+//ind["eth1Rx"].scaleValuesText=ind["default"].scaleValuesText.slice();
+//ind["eth1Rx"].firstTeek=ind["default"].firstTeek;
+
+//ind["eth1Tx"].scaleValuesDigits=ind["default"].scaleValuesDigits.slice()
+//ind["eth1Tx"].scaleValues=ind["default"].scaleValues.slice();
+//ind["eth1Tx"].scaleValuesText=ind["default"].scaleValuesText.slice();
+//ind["eth1Tx"].firstTeek=ind["default"].firstTeek;
+
+// ind["AllInetRx"].scaleValuesDigits=ind["default"].scaleValuesDigits.slice()
+// ind["AllInetRx"].scaleValues=ind["default"].scaleValues.slice();
+// ind["AllInetRx"].scaleValuesText=ind["default"].scaleValuesText.slice();
+// ind["AllInetRx"].firstTeek=ind["default"].firstTeek;
+//
+// ind["AllInetTx"].scaleValuesDigits=ind["default"].scaleValuesDigits.slice()
+// ind["AllInetTx"].scaleValues=ind["default"].scaleValues.slice();
+// ind["AllInetTx"].scaleValuesText=ind["default"].scaleValuesText.slice();
+// ind["AllInetTx"].firstTeek=ind["default"].firstTeek;
+
+var px=10, py=10,cols=2,diam=270,
+		bg=Raphael (px, py, diam*cols+10, 11+diam),
+		bgrect=bg.rect (4, 5, cols*diam+1, diam, 20);
+	bgrect.attr ("fill", "black");
+//	txt2=bg.text (diam*cols-16, 245, "Ajax\n+\nSVG");
+//	txt2.attr ({fill: "gray", "font-size": 12, "font-style": "italic", "font-weight": "bold"});
+
+	paintIndicator ("PPP0Rx", px+10, py+10, "Приём\nppp0", 5, diam-30, 2, 7);
+	paintIndicator ("PPP0Tx", px+diam+10, py+10, "Передача\nppp0", 5, diam-30, 2, 7);
+//	paintIndicator ("eth1Rx", px+10, py+10, "Приём\neth1", 5, diam-30, 2, 7);
+//	paintIndicator ("eth1Tx", px+diam+10, py+10, "Передача\neth1", 5, diam-30, 2, 7);
+// 	paintIndicator ("AllInetRx", px+10, py+10, "Приём\nppp0+eth1", 1, diam-30, 2, 7);
+// 	paintIndicator ("AllInetTx", px+diam+10, py+10, "Передача\nppp0+eth1", 1, diam-30, 2, 7);
+
+// Таймер. Каждые 1000 мс запускает getIfacesSpeed()
+//var timerGetSpeed=setInterval ("getIfacesSpeed();",1100);
+var timerGetSpeed=setInterval ("getIfacesSpeed();",1000);
+}
+
+</script>
+<table style="width: 100%"><tr>
+<td style="width: 550px"><div id="canvas"></div></td>
+<td></td>
+</tr></table>
+</body>
+</html>
