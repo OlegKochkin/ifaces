@@ -5,4 +5,4 @@ Put files in web folder and edit "getIfacesSpeed.php" for you sensors.
 
 ![Example](ifaces.png)
 
-http://kochkin.tk/ifaces/
+http://kochkin.mooo.com/ifaces/
